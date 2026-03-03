@@ -113,6 +113,16 @@ def get_boiler_data(url: str) -> tuple[str, float | None, float | None]:
                 except ValueError:
                     log.warning("Could not parse Fire Temp value: %r", spans[0].get_text())
 
+    # If either temp is still None, log a snippet of the raw HTML to help
+    # diagnose whether the page structure changed or the response was malformed.
+    if water_temp is None or fire_temp is None:
+        snippet = html[:3000].replace("\n", " ").replace("\r", "")
+        log.warning(
+            "Could not parse all temp values (water=%s, fire=%s). "
+            "Raw HTML snippet (first 3000 chars): %s",
+            water_temp, fire_temp, snippet,
+        )
+
     return furnace_status, water_temp, fire_temp
 
 
