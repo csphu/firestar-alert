@@ -50,7 +50,7 @@ No login, no cloud API, no proprietary protocol — just a local HTTP GET.
 - **Restarting the service resets all alert backoff state**
 - Runs as a **systemd service** — starts automatically at boot, restarts on crash
 - All thresholds and intervals are configurable via `config.ini` without editing code
-- Logs to the systemd journal and a local `monitor.log` file
+- Logs to the systemd journal and a local `monitor.log` file with automatic rotation (1 MB cap, 3 backups kept)
 
 ---
 
@@ -86,7 +86,7 @@ firestar-alert/
 ├── requirements.txt         # Python dependencies
 ├── firestar-alert.service   # systemd unit file
 ├── install.sh               # Installer script for the Raspberry Pi
-├── monitor.log              # Created at runtime — rolling log file
+├── monitor.log              # Created at runtime — rotates at 1 MB, keeps monitor.log.1-.3
 └── state.json               # Created at runtime — cleared on every service restart
 ```
 
@@ -171,7 +171,7 @@ All settings live in `config.ini`.
 
 | Key | Default | Description |
 |---|---|---|
-| `topic` | `csphu-boiler-alert` | Your ntfy topic name — must match what you subscribed to in the app. Make it unique. |
+| `topic` | `your-unique-topic-name` | Your ntfy topic name — must match what you subscribed to in the app. Make it unique. |
 | `server` | `https://ntfy.sh` | ntfy server URL. Change only if self-hosting. |
 
 ### `[alerts]`
