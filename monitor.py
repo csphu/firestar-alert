@@ -163,8 +163,10 @@ def check_thresholds(
     fire_min  = float(cfg["boiler"]["fire_temp_min"])
     issues: list[str] = []
 
-    if furnace_status != "ON":
-        issues.append(f"Furnace Status: {furnace_status} (expected ON)")
+    if furnace_status == "OFF":
+        issues.append(f"Furnace Status: OFF (expected ON)")
+    elif furnace_status == "Unknown":
+        log.debug("Furnace status unreadable — skipping threshold check for this cycle.")
 
     if water_temp is None:
         log.debug("Water Temp unreadable — skipping threshold check for this cycle.")
