@@ -18,6 +18,7 @@ import json
 import logging
 import configparser
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import requests
@@ -38,7 +39,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
     handlers=[
-        logging.FileHandler(LOG_FILE),
+        RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3),
         logging.StreamHandler(),
     ],
 )
