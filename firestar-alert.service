@@ -1,6 +1,6 @@
 [Unit]
 Description=Firestar XP Boiler Monitor
-Documentation=https://github.com/csphuler/firestar-alert
+Documentation=https://github.com/csphu/firestar-alert
 # Wait until the network stack is up so the first HTTP request works
 After=network-online.target
 Wants=network-online.target
