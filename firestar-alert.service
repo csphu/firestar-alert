@@ -1,0 +1,26 @@
+[Unit]
+Description=Firestar XP Boiler Monitor
+Documentation=https://github.com/csphuler/firestar-alert
+# Wait until the network stack is up so the first HTTP request works
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+
+# Adjust this path if you installed somewhere other than /home/pi/firestar-alert
+WorkingDirectory=/home/pi/firestar-alert
+ExecStart=/home/pi/firestar-alert/venv/bin/python /home/pi/firestar-alert/monitor.py
+
+# Restart the service if it crashes
+Restart=on-failure
+RestartSec=15
+
+# Write stdout/stderr to the journal (view with: journalctl -u firestar-alert -f)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
