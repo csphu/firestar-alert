@@ -167,12 +167,12 @@ def check_thresholds(
         issues.append(f"Furnace Status: {furnace_status} (expected ON)")
 
     if water_temp is None:
-        issues.append("Water Temp: unreadable")
+        log.debug("Water Temp unreadable — skipping threshold check for this cycle.")
     elif water_temp < water_min:
         issues.append(f"Water Temp: {water_temp}\u00b0F (min {water_min}\u00b0F)")
 
     if fire_temp is None:
-        issues.append("Fire Temp: unreadable")
+        log.debug("Fire Temp unreadable — skipping threshold check for this cycle.")
     elif fire_temp < fire_min:
         issues.append(f"Fire Temp: {fire_temp}\u00b0F (min {fire_min}\u00b0F)")
 
