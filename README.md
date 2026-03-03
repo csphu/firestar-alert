@@ -28,7 +28,7 @@ No login, no cloud API, no proprietary protocol — just a local HTTP GET.
 
 ## Features
 
-- Polls `http://192.168.1.113` every minute under normal conditions
+- Polls `http://192.168.1.113` every 5 minutes under normal conditions
 - Sends **push notifications via [ntfy.sh](https://ntfy.sh)** (free, no account needed)
 - Detects and alerts on:
   - Furnace Status ≠ ON (fire out, fault condition, etc.)
@@ -39,7 +39,7 @@ No login, no cloud API, no proprietary protocol — just a local HTTP GET.
 
   | Alerts sent | Poll interval |
   |---|---|
-  | 0 (normal) | 1 minute |
+  | 0 (normal) | 5 minutes |
   | 1st alert sent | 10 minutes |
   | 2nd alert sent | 30 minutes |
   | 3rd+ alert sent | 60 minutes |
@@ -178,7 +178,7 @@ All settings live in `config.ini`.
 
 | Key | Default | Description |
 |---|---|---|
-| `normal_interval` | `1` | Polling interval when everything is OK (minutes) |
+| `normal_interval` | `5` | Polling interval when everything is OK (minutes) |
 | `interval_after_first_alert` | `10` | Polling interval after 1st alert (minutes) |
 | `interval_after_second_alert` | `30` | Polling interval after 2nd alert (minutes) |
 | `interval_after_third_alert` | `60` | Polling interval after 3rd+ alert (minutes) |
@@ -236,7 +236,7 @@ Fire:    197°F
 ────────────────────
 Water min: 165°F
 Fire min:  200°F
-Interval:  1m
+Interval:  5m
 ```
 
 **Problem alert (ntfy title):** `BOILER ALERT`
