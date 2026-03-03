@@ -1,5 +1,11 @@
 # firestar-alert
 
+[![Release](https://img.shields.io/github/v/release/csphu/firestar-alert?style=flat-square&color=blue)](https://github.com/csphu/firestar-alert/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-C51A4A?style=flat-square&logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.com/)
+[![Notifications](https://img.shields.io/badge/notifications-ntfy.sh-orange?style=flat-square)](https://ntfy.sh)
+
 A lightweight Raspberry Pi monitor for the **Central Boiler Firestar XP** wood-fired outdoor boiler.
 
 > **Note:** This project is not affiliated with, endorsed by, or in any way connected to Central Boiler. It reads data from the local HTTP status page the Firestar XP controller already exposes on your home network — the same page viewable in any browser. No proprietary protocols are reversed, no cloud services are accessed, and no Central Boiler systems are modified.
