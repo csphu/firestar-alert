@@ -66,15 +66,41 @@ def save_state(state: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Alarm code lookup  (mirrors the JS LookupTable/ResultTable in index.html)
+# ---------------------------------------------------------------------------
+ALARM_LOOKUP: dict[str, str] = {
+    "gas":   "Auto Relight",
+    "gas2":  "Wood Ignition",
+    "high":  "High Water",
+    "high2": "High Water Snapdisk",
+    "low":   "Low Water",
+    "diag":  "Diagnostics",
+    "door":  "Door Open",
+    "e.f.": "EEPROM Failure",
+    "t.c.": "Failed Thermocouple",
+    "g.f.": "Gas Fail",
+    "a-2":  "Auto Relight Failure",
+    "web":  "Web Connection Lost",
+}
+
+
+def resolve_alarm(code: str) -> str:
+    """Return the human-readable label for an alarm code, or the code itself."""
+    return ALARM_LOOKUP.get(code.lower(), code)
+
+
+# ---------------------------------------------------------------------------
 # Boiler scraper
 # ---------------------------------------------------------------------------
-def get_boiler_data(url: str) -> tuple[str, float | None, float | None]:
+def get_boiler_data(url: str) -> tuple[str, float | None, float | None, str, str]:
     """
     Fetch the Firestar XP status page and return
-    (furnace_status, water_temp, fire_temp).
+    (furnace_status, water_temp, fire_temp, alarm1, alarm2).
 
     Furnace status is embedded in the page JS as:
         (parseInt('N')>0) ? "ON" : "OFF"
+    Alarm strings come from JS like:
+        spanAlarm1.innerHTML = GetStringReplacement('BYPASS');
     Water Temp / Fire Temp are in <span class='ContentText'> cells.
     """
     resp = requests.get(url, timeout=10)
@@ -92,6 +118,15 @@ def get_boiler_data(url: str) -> tuple[str, float | None, float | None]:
         isnan_match = re.search(r"isNaN\('([^']*)'\)", html)
         if isnan_match and isnan_match.group(1) == "":
             furnace_status = "Unknown"
+
+    # --- Alarm strings (parsed from inline JavaScript) ---
+    alarm1 = ""
+    alarm2 = ""
+    alarm_matches = re.findall(r"spanAlarm\d\.innerHTML\s*=\s*GetStringReplacement\('([^']*)'\)", html)
+    if len(alarm_matches) >= 1:
+        alarm1 = alarm_matches[0].strip()
+    if len(alarm_matches) >= 2:
+        alarm2 = alarm_matches[1].strip()
 
     # --- Water Temp and Fire Temp (parsed from HTML table) ---
     water_temp: float | None = None
@@ -124,19 +159,19 @@ def get_boiler_data(url: str) -> tuple[str, float | None, float | None]:
             water_temp, fire_temp, snippet,
         )
 
-    return furnace_status, water_temp, fire_temp
+    return furnace_status, water_temp, fire_temp, alarm1, alarm2
 
 
 def get_boiler_data_with_retry(
     url: str,
     retries: int = 3,
     delay: int = 10,
-) -> tuple[str, float | None, float | None]:
+) -> tuple[str, float | None, float | None, str, str]:
     """Call get_boiler_data, retrying if either temp value is unreadable."""
     for attempt in range(1, retries + 1):
-        furnace_status, water_temp, fire_temp = get_boiler_data(url)
+        furnace_status, water_temp, fire_temp, alarm1, alarm2 = get_boiler_data(url)
         if water_temp is not None and fire_temp is not None:
-            return furnace_status, water_temp, fire_temp
+            return furnace_status, water_temp, fire_temp, alarm1, alarm2
         if attempt < retries:
             log.warning(
                 "Temp(s) unreadable on attempt %d/%d "
@@ -146,7 +181,7 @@ def get_boiler_data_with_retry(
             time.sleep(delay)
     # Return whatever we have after all retries
     log.warning("Temp(s) still unreadable after %d attempts.", retries)
-    return furnace_status, water_temp, fire_temp
+    return furnace_status, water_temp, fire_temp, alarm1, alarm2
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +192,8 @@ def check_thresholds(
     furnace_status: str,
     water_temp: float | None,
     fire_temp: float | None,
+    alarm1: str = "",
+    alarm2: str = "",
 ) -> list[str]:
     """Return a list of human-readable issue strings for any failed threshold."""
     water_min = float(cfg["boiler"]["water_temp_min"])
@@ -177,6 +214,10 @@ def check_thresholds(
         log.debug("Fire Temp unreadable — skipping threshold check for this cycle.")
     elif fire_temp < fire_min:
         issues.append(f"Fire Temp: {fire_temp}\u00b0F (min {fire_min}\u00b0F)")
+
+    for label, alarm in (("Alarm 1", alarm1), ("Alarm 2", alarm2)):
+        if alarm:
+            issues.append(f"{label}: {resolve_alarm(alarm)}")
 
     return issues
 
@@ -256,14 +297,20 @@ def main() -> None:
     # ----------------------------------------------------------------
     try:
         url = cfg["boiler"]["url"]
-        furnace_status, water_temp, fire_temp = get_boiler_data_with_retry(url)
+        furnace_status, water_temp, fire_temp, alarm1, alarm2 = get_boiler_data_with_retry(url)
         now = datetime.now()
+        alarm_lines = ""
+        if alarm1:
+            alarm_lines += f"Alarm 1: {resolve_alarm(alarm1)}\n"
+        if alarm2:
+            alarm_lines += f"Alarm 2: {resolve_alarm(alarm2)}\n"
         startup_body = (
             f"Time: {now.strftime('%Y-%m-%d %H:%M')}\n"
             f"Furnace: {furnace_status}\n"
             f"Water:   {water_temp}°F\n"
             f"Fire:    {fire_temp}°F\n"
-            f"────────────────────\n"
+            + (alarm_lines if alarm_lines else "")
+            + f"────────────────────\n"
             f"Water min: {cfg['boiler']['water_temp_min']}°F\n"
             f"Fire min:  {cfg['boiler']['fire_temp_min']}°F\n"
             f"Interval:  {cfg['alerts']['normal_interval']}m"
@@ -287,15 +334,17 @@ def main() -> None:
 
         try:
             url = cfg["boiler"]["url"]
-            furnace_status, water_temp, fire_temp = get_boiler_data_with_retry(url)
+            furnace_status, water_temp, fire_temp, alarm1, alarm2 = get_boiler_data_with_retry(url)
             log.info(
-                "Furnace=%s  Water=%.1f°F  Fire=%.0f°F",
+                "Furnace=%s  Water=%.1f°F  Fire=%.0f°F  Alarm1=%r  Alarm2=%r",
                 furnace_status,
                 water_temp if water_temp is not None else 0.0,
                 fire_temp  if fire_temp  is not None else 0.0,
+                alarm1,
+                alarm2,
             )
 
-            issues = check_thresholds(cfg, furnace_status, water_temp, fire_temp)
+            issues = check_thresholds(cfg, furnace_status, water_temp, fire_temp, alarm1, alarm2)
             now    = datetime.now()
 
             # ---- ERROR STATE ----
@@ -329,15 +378,21 @@ def main() -> None:
 
                 if time_since_last >= sleep_secs:
                     subject = "BOILER ALERT"
+                    alarm_detail = ""
+                    if alarm1:
+                        alarm_detail += f"Alarm 1: {resolve_alarm(alarm1)}\n"
+                    if alarm2:
+                        alarm_detail += f"Alarm 2: {resolve_alarm(alarm2)}\n"
                     body = (
                         f"Firestar XP Alert\n"
                         f"Time: {now.strftime('%Y-%m-%d %H:%M')}\n"
-                        f"{'\u2500' * 20}\n"
+                        f"{chr(9472) * 20}\n"
                         + "\n".join(f"  \u2022 {issue}" for issue in issues)
-                        + f"\n{'\u2500' * 20}\n"
+                        + f"\n{chr(9472) * 20}\n"
                         f"Furnace: {furnace_status}\n"
                         f"Water:   {water_temp}\u00b0F\n"
-                        f"Fire:    {fire_temp}\u00b0F"
+                        f"Fire:    {fire_temp}\u00b0F\n"
+                        + alarm_detail
                     )
                     try:
                         send_sms(cfg, subject, body)
@@ -354,6 +409,11 @@ def main() -> None:
                 if state["in_error"]:
                     log.info("Boiler recovered. Sending recovery notification.")
                     try:
+                        recovery_alarm = ""
+                        if alarm1:
+                            recovery_alarm += f"Alarm 1: {resolve_alarm(alarm1)}\n"
+                        if alarm2:
+                            recovery_alarm += f"Alarm 2: {resolve_alarm(alarm2)}\n"
                         send_sms(
                             cfg,
                             "BOILER RECOVERED",
@@ -361,7 +421,8 @@ def main() -> None:
                             f"Time: {now.strftime('%Y-%m-%d %H:%M')}\n"
                             f"Furnace: {furnace_status}\n"
                             f"Water:   {water_temp}\u00b0F\n"
-                            f"Fire:    {fire_temp}\u00b0F",
+                            f"Fire:    {fire_temp}\u00b0F\n"
+                            + recovery_alarm,
                         )
                     except Exception as e:
                         log.error("Failed to send recovery SMS: %s", e)

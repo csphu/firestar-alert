@@ -20,7 +20,9 @@ The Firestar XP controller hosts a small status page at a static IP on your home
 
 ## How It Works
 
-The Firestar XP serves a plain HTML/JavaScript status page on your local network. The page embeds the furnace state as an integer in inline JavaScript and renders Water Temp and Fire Temp as plain text in an HTML table. This script fetches that page, extracts those values with a regex and BeautifulSoup, compares them against configurable thresholds, and fires a push notification via ntfy.sh when a threshold is violated.
+The Firestar XP serves a plain HTML/JavaScript status page on your local network. The page embeds the furnace state as an integer in inline JavaScript, renders Water Temp and Fire Temp as plain text in an HTML table, and populates two alarm fields via JavaScript string literals. This script fetches that page, extracts all of those values with a regex and BeautifulSoup, compares them against configurable thresholds, and fires a push notification via ntfy.sh when a threshold is violated.
+
+The alarm fields carry firmware fault codes (e.g. `DOOR`, `T.C.`, `BYPASS`) which are mapped to human-readable labels using the same lookup table the Firestar XP's own web UI uses.
 
 No login, no cloud API, no proprietary protocol — just a local HTTP GET.
 
@@ -34,6 +36,8 @@ No login, no cloud API, no proprietary protocol — just a local HTTP GET.
   - Furnace Status ≠ ON (fire out, fault condition, etc.)
   - Water Temp < 165 °F
   - Fire Temp < 200 °F
+  - Any non-empty **alarm field** reported by the firmware (Door Open, Failed Thermocouple, Gas Fail, Bypass Handle Up, etc.)
+- **Alarm codes are resolved to human-readable labels** using the same lookup table as the Firestar XP web UI; unknown codes fall back to their raw value
 - **Retries up to 3 times** before alerting if temp values are unreadable
 - **Smart alert backoff** — avoids spamming you if the problem persists:
 
@@ -225,7 +229,7 @@ journalctl -u firestar-alert --no-pager
 
 ## Alert Examples
 
-Alerts appear as push notifications in the ntfy app with a � tag on startup, 🔥 for problems, and ✅ for recovery.
+Alerts appear as push notifications in the ntfy app with a 🔔 tag on startup, 🔥 for problems, and ✅ for recovery.
 
 **Startup notification (ntfy title):** `MONITOR STARTED`
 ```
@@ -233,6 +237,19 @@ Time: 2026-03-03 11:49
 Furnace: ON
 Water:   186.4°F
 Fire:    197°F
+────────────────────
+Water min: 165°F
+Fire min:  200°F
+Interval:  5m
+```
+
+**Startup notification with active alarm (ntfy title):** `MONITOR STARTED`
+```
+Time: 2026-03-04 08:12
+Furnace: ON
+Water:   191.6°F
+Fire:    233°F
+Alarm 2: BYPASS
 ────────────────────
 Water min: 165°F
 Fire min:  200°F
@@ -252,6 +269,19 @@ Water:   158.2°F
 Fire:    143.0°F
 ```
 
+**Alarm alert (ntfy title):** `BOILER ALERT`
+```
+Firestar XP Alert
+Time: 2026-03-04 09:47
+────────────────────
+  • Alarm 2: Door Open
+────────────────────
+Furnace: ON
+Water:   190.5°F
+Fire:    256°F
+Alarm 2: Door Open
+```
+
 **Recovery notification (ntfy title):** `BOILER RECOVERED`
 ```
 Firestar XP recovered.
@@ -260,6 +290,24 @@ Furnace: ON
 Water:   187.5°F
 Fire:    312.0°F
 ```
+
+### Alarm Code Reference
+
+| Firmware code | Displayed as |
+|---|---|
+| `GAS` | Auto Relight |
+| `GAS2` | Wood Ignition |
+| `HIGH` | High Water |
+| `HIGH2` | High Water Snapdisk |
+| `LOW` | Low Water |
+| `DIAG` | Diagnostics |
+| `DOOR` | Door Open |
+| `E.F.` | EEPROM Failure |
+| `T.C.` | Failed Thermocouple |
+| `G.F.` | Gas Fail |
+| `A-2` | Auto Relight Failure |
+| `WEB` | Web Connection Lost |
+| *(unknown)* | Raw code as-is (e.g. `BYPASS`) |
 
 ---
 
